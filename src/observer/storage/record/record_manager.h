@@ -14,12 +14,12 @@ See the Mulan PSL v2 for more details. */
 //
 #pragma once
 
-#include "common/lang/bitmap.h"
-#include "storage/buffer/disk_buffer_pool.h"
-#include "storage/record/record.h"
-#include "storage/trx/latch_memo.h"
-#include <limits>
 #include <sstream>
+#include <limits>
+#include "storage/buffer/disk_buffer_pool.h"
+#include "storage/trx/latch_memo.h"
+#include "storage/record/record.h"
+#include "common/lang/bitmap.h"
 
 class ConditionFilter;
 class RecordPageHandler;
@@ -29,7 +29,7 @@ class Table;
 /**
  * @brief 这里负责管理在一个文件上表记录(行)的组织/管理
  * @defgroup RecordManager
- *
+ * 
  * @details 表记录管理的内容包括如何在文件上存放、读取、检索。也就是记录的增删改查。
  * 这里的文件都会被拆分成页面，每个页面都有一样的大小。更详细的信息可以参考BufferPool。
  * 按照BufferPool的设计，第一个页面用来存放BufferPool本身的元数据，比如当前文件有多少页面、已经分配了多少页面、
@@ -94,10 +94,10 @@ public:
 
   /**
    * @brief 读取下一个记录到record中包括RID和数据，并更新下一个记录位置next_slot_num_
-   *
+   * 
    * @param record 返回的下一个记录
    */
-  RC next(Record &record);
+  RC   next(Record &record);
 
   /**
    * 该迭代器是否有效
@@ -138,7 +138,7 @@ public:
 
   /**
    * @brief 数据库恢复时，与普通的运行场景有所不同，不做任何并发操作，也不需要加锁
-   *
+   * 
    * @param buffer_pool 关联某个文件时，都通过buffer pool来做读写文件
    * @param page_num    操作的页面编号
    */
@@ -167,8 +167,15 @@ public:
   RC insert_record(const char *data, RID *rid);
 
   /**
-   * @brief 数据库恢复时，在指定位置插入数据
+   * @brief 更新一条记录
    *
+   * @param rec 要更新的记录
+   */
+
+  RC update_record(Record *rec);
+  /**
+   * @brief 数据库恢复时，在指定位置插入数据
+   * 
    * @param data 要插入的数据行
    * @param rid  插入的位置
    */
@@ -201,16 +208,15 @@ public:
 
 protected:
   /**
-   * @details
+   * @details 
    * 前面在计算record_capacity时并没有考虑对齐，但第一个record需要8字节对齐
    * 因此按此前计算的record_capacity，最后一个记录的部分数据可能会被挤出页面
    * 所以需要对record_capacity进行修正，保证记录不会溢出
    */
-  void fix_record_capacity()
-  {
-    int32_t last_record_offset =
-        page_header_->first_record_offset + page_header_->record_capacity * page_header_->record_size;
-    while (last_record_offset > BP_PAGE_DATA_SIZE) {
+  void fix_record_capacity() {
+    int32_t last_record_offset = page_header_->first_record_offset + 
+                                 page_header_->record_capacity * page_header_->record_size;
+    while(last_record_offset > BP_PAGE_DATA_SIZE) {
       page_header_->record_capacity -= 1;
       last_record_offset -= page_header_->record_size;
     }
@@ -218,7 +224,7 @@ protected:
 
   /**
    * @brief 获取指定槽位的记录数据
-   *
+   * 
    * @param 指定的记录槽位
    */
   char *get_record_data(SlotNum slot_num)
@@ -228,13 +234,69 @@ protected:
 
 protected:
   DiskBufferPool *disk_buffer_pool_ = nullptr;  ///< 当前操作的buffer pool(文件)
-  Frame *frame_ = nullptr;  ///< 当前操作页面关联的frame(frame的更多概念可以参考buffer pool和frame)
-  bool   readonly_         = false;    ///< 当前的操作是否都是只读的
-  PageHeader *page_header_ = nullptr;  ///< 当前页面上页面头
-  char       *bitmap_      = nullptr;  ///< 当前页面上record分配状态信息bitmap内存起始位置
+  Frame          *frame_            = nullptr;  ///< 当前操作页面关联的frame(frame的更多概念可以参考buffer pool和frame)
+  bool            readonly_         = false;    ///< 当前的操作是否都是只读的
+  PageHeader     *page_header_      = nullptr;  ///< 当前页面上页面头
+  char           *bitmap_           = nullptr;  ///< 当前页面上record分配状态信息bitmap内存起始位置
 
 private:
   friend class RecordPageIterator;
+};
+
+class TextPageHandler
+{
+public:
+  TextPageHandler();
+  ~TextPageHandler();
+
+  /**
+   * @brief 初始化
+   */
+  RC init(DiskBufferPool &buffer_pool, PageNum page_num, bool readonly);
+
+  /**
+   * @brief 对一个新的页面做初始化，初始化关于该页面记录信息的页头PageHeader
+   * @param record_size 设置为固定值64字节
+   */
+  RC init_empty_page(DiskBufferPool &buffer_pool, PageNum page_num, int record_size = BP_TEXT_SLOT_SIZE);
+
+  /**
+   * @brief 操作结束后做的清理工作，比如释放页面、解锁
+   */
+  RC cleanup();
+
+  /**
+   * @brief 插入一条记录
+   *
+   * @param data 要插入的记录
+   * @param rid  如果插入成功，通过这个参数返回插入的位置
+   */
+  RC insert_text(const char *data, RID *rid);
+
+  /**
+   * @brief 更新一条记录
+   * @param rid 要更新的text的起始位置
+   * @param rec 新的text数据
+   */
+  RC update_text(RID *rid, char *rec);
+
+  /**
+   * @brief 删除指定的text
+   */
+  RC delete_text(const RID *rid);
+
+  /**
+   * @brief 获取指定位置的text数据
+   * @param rec 存放返回数据的内存空间
+   */
+  RC get_text(const RID *rid, char *rec);
+
+protected:
+  DiskBufferPool *disk_buffer_pool_ = nullptr;  ///< 当前操作的buffer pool(文件)
+  Frame          *frame_            = nullptr;  ///< 当前操作页面关联的frame(frame的更多概念可以参考buffer pool和frame)
+  bool            readonly_         = false;    ///< 当前的操作是否都是只读的
+  PageHeader     *page_header_      = nullptr;  ///< 当前页面上页面头
+  char           *bitmap_           = nullptr;  ///< 当前页面上record分配状态信息bitmap内存起始位置
 };
 
 /**
@@ -262,14 +324,14 @@ public:
 
   /**
    * @brief 从指定文件中删除指定槽位的记录
-   *
+   * 
    * @param rid 待删除记录的标识符
    */
   RC delete_record(const RID *rid);
 
   /**
    * @brief 插入一个新的记录到指定文件中，并返回该记录的标识符
-   *
+   * 
    * @param data        纪录内容
    * @param record_size 记录大小
    * @param rid         返回该记录的标识符
@@ -277,8 +339,15 @@ public:
   RC insert_record(const char *data, int record_size, RID *rid);
 
   /**
-   * @brief 数据库恢复时，在指定文件指定位置插入数据
+   * @brief 更新一条记录
    *
+   * @param data 要更新的记录
+   */
+
+  RC update_record(Record *rec);
+   /**
+   * @brief 数据库恢复时，在指定文件指定位置插入数据
+   * 
    * @param data        记录内容
    * @param record_size 记录大小
    * @param rid         要插入记录的指定标识符
@@ -315,7 +384,7 @@ private:
 private:
   DiskBufferPool             *disk_buffer_pool_ = nullptr;
   std::unordered_set<PageNum> free_pages_;  ///< 没有填充满的页面集合
-  common::Mutex               lock_;  ///< 当编译时增加-DCONCURRENCY=ON 选项时，才会真正的支持并发
+  common::Mutex               lock_;        ///< 当编译时增加-DCONCURRENCY=ON 选项时，才会真正的支持并发
 };
 
 /**
@@ -345,7 +414,7 @@ public:
    */
   RC close_scan();
 
-  /**
+  /** 
    * @brief 判断是否还有数据
    * @details 判断完成后调用next获取下一条数据
    */
@@ -353,12 +422,12 @@ public:
 
   /**
    * @brief 获取下一条记录
-   *
+   * 
    * @param record 返回的下一条记录
-   *
+   * 
    * @details 获取下一条记录之前先调用has_next()判断是否还有数据
    */
-  RC next(Record &record);
+  RC   next(Record &record);
 
 private:
   /**
@@ -373,11 +442,10 @@ private:
 
 private:
   // TODO 对于一个纯粹的record遍历器来说，不应该关心表和事务
-  Table *table_ = nullptr;  ///< 当前遍历的是哪张表。这个字段仅供事务函数使用，如果设计合适，可以去掉
-
-  DiskBufferPool *disk_buffer_pool_ = nullptr;  ///< 当前访问的文件
-  Trx            *trx_              = nullptr;  ///< 当前是哪个事务在遍历
-  bool            readonly_         = false;    ///< 遍历出来的数据，是否可能对它做修改
+  Table             *table_            = nullptr;  ///< 当前遍历的是哪张表。这个字段仅供事务函数使用，如果设计合适，可以去掉
+  DiskBufferPool    *disk_buffer_pool_ = nullptr;  ///< 当前访问的文件
+  Trx               *trx_              = nullptr;  ///< 当前是哪个事务在遍历
+  bool               readonly_         = false;    ///< 遍历出来的数据，是否可能对它做修改
 
   BufferPoolIterator bp_iterator_;                 ///< 遍历buffer pool的所有页面
   ConditionFilter   *condition_filter_ = nullptr;  ///< 过滤record

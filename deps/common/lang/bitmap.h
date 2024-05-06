@@ -16,16 +16,17 @@ See the Mulan PSL v2 for more details. */
 
 namespace common {
 
-class Bitmap
-{
+class Bitmap {
 public:
   Bitmap();
   Bitmap(char *bitmap, int size);
 
   void init(char *bitmap, int size);
   bool get_bit(int index);
+  bool get_bit(int index) const;
   void set_bit(int index);
   void clear_bit(int index);
+  void clear_bits();
 
   /**
    * @param start 从哪个位开始查找，start是包含在内的
@@ -35,7 +36,7 @@ public:
 
 private:
   char *bitmap_;
-  int   size_;
+  int size_;
 };
 
 }  // namespace common

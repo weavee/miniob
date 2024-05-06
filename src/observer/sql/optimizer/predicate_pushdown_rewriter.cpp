@@ -13,10 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/optimizer/predicate_pushdown_rewriter.h"
-#include "common/log/log.h"
-#include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
+#include "sql/operator/join_logical_operator.h"
+#include "sql/expr/expression.h"
 
 RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
 {
@@ -29,26 +29,36 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
     return rc;
   }
 
-  std::unique_ptr<LogicalOperator> &child_oper = oper->children().front();
-  if (child_oper->type() != LogicalOperatorType::TABLE_GET) {
-    return rc;
-  }
-
-  auto table_get_oper = static_cast<TableGetLogicalOperator *>(child_oper.get());
-
   std::vector<std::unique_ptr<Expression>> &predicate_oper_exprs = oper->expressions();
   if (predicate_oper_exprs.size() != 1) {
+    // predicate logical oper 里一定是只有一个孩子: 要么是 conjunction expr 要么是 comparison expr
     return rc;
   }
 
-  std::unique_ptr<Expression>             &predicate_expr = predicate_oper_exprs.front();
+  std::unique_ptr<Expression> &predicate_expr = predicate_oper_exprs.front();
+  std::unique_ptr<LogicalOperator> &child_oper = oper->children().front();
+  if (child_oper->type() == LogicalOperatorType::TABLE_GET) {
+    auto table_get_oper = static_cast<TableGetLogicalOperator *>(child_oper.get());
+
   std::vector<std::unique_ptr<Expression>> pushdown_exprs;
-  rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
+    rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    if (!pushdown_exprs.empty()) {
+      change_made = true;
+      table_get_oper->set_predicates(std::move(pushdown_exprs));
+    }
+  } else if (child_oper->type() == LogicalOperatorType::JOIN) {
+    auto join_oper = static_cast<JoinLogicalOperator *>(child_oper.get());
+    // 直接下推 JOIN 算子的左右两边有可能是 table_get 有可能是 join 有可能是 predicate
+    // 是 table_get 的话就直接下推到 table_get 中
+    // 否则就新构建一个 predicate logical operator 挂在 join 或者 predicate 上面
+    // 两边都不是 table_get 的时候不进行下推 TODO(wbj) 此时仍然是有下推机会的
     return rc;
   }
-
   if (!predicate_expr) {
     // 所有的表达式都下推到了下层算子
     // 这个predicate operator其实就可以不要了。但是这里没办法删除，弄一个空的表达式吧
@@ -58,10 +68,6 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
     predicate_expr = std::unique_ptr<Expression>(new ValueExpr(value));
   }
 
-  if (!pushdown_exprs.empty()) {
-    change_made = true;
-    table_get_oper->set_predicates(std::move(pushdown_exprs));
-  }
   return rc;
 }
 
@@ -100,15 +106,15 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     }
   } else if (expr->type() == ExprType::COMPARISON) {
     // 如果是比较操作，并且比较的左边或右边是表某个列值，那么就下推下去
-    auto   comparison_expr = static_cast<ComparisonExpr *>(expr.get());
-    CompOp comp            = comparison_expr->comp();
+    auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
+    CompOp comp = comparison_expr->comp();
     if (comp != EQUAL_TO) {
       // 简单处理，仅取等值比较。当然还可以取一些范围比较，还有 like % 等操作
       // 其它的还有 is null 等
       return rc;
     }
 
-    std::unique_ptr<Expression> &left_expr  = comparison_expr->left();
+    std::unique_ptr<Expression> &left_expr = comparison_expr->left();
     std::unique_ptr<Expression> &right_expr = comparison_expr->right();
     // 比较操作的左右两边只要有一个是取列字段值的并且另一边也是取字段值或常量，就pushdown
     if (left_expr->type() != ExprType::FIELD && right_expr->type() != ExprType::FIELD) {

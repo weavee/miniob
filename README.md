@@ -1,8 +1,7 @@
-<div align="center">
+初赛总结：[Summary · Issue #46 · luooofan/miniob-2023](https://github.com/luooofan/miniob-2023/issues/46)
 
-[![Coverage Status](https://codecov.io/gh/oceanbase/miniob/branch/main/graph/badge.svg)](https://codecov.io/gh/oceanbase/miniob)
+![image](https://github.com/luooofan/miniob-2023/assets/46896167/cf9524e1-d083-4533-acbf-33409cd1f68c)
 
-</div>
 
 # MiniOB 概述
 
@@ -94,9 +93,6 @@ OceanBase 初赛基于一套适合初学者实践的数据库实训平台 MiniOB
 # Contributing
 
 OceanBase 社区热情欢迎每一位对数据库技术热爱的开发者，期待与您携手开启思维碰撞之旅。无论是文档格式调整或文字修正、问题修复还是增加新功能，都是参与和贡献 OceanBase 社区的方式之一。现在就开始您的首次贡献吧！更多详情，请参考 [社区贡献](CONTRIBUTING.md).
-
-# Contributors
-<a href="https://github.com/oceanbase/miniob/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=oceanbase/miniob&width=890" /></a>
 
 # License
 
