@@ -126,12 +126,7 @@ RC LogicalPlanGenerator::create_plan(
   // const std::vector<Field> &all_fields = select_stmt->query_fields();
 
   auto process_one_table = [/*, &all_fields*/](unique_ptr<LogicalOperator>& prev_oper, Table* table, FilterStmt* fu) {
-    std::vector<Field> fields; // TODO(wbj) 现在没用这个
-    // for (const Field &field : all_fields) {
-    //   if (0 == strcmp(field.table_name(), table->name())) {
-    //     fields.push_back(field);
-    //   }
-    // }
+    std::vector<Field> fields; 
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true/*readonly*/));
     unique_ptr<LogicalOperator> predicate_oper;
     if (nullptr != fu) {
@@ -200,54 +195,48 @@ RC LogicalPlanGenerator::create_plan(
       top_oper = std::move(predicate_oper);
     }
   }
-  if (select_stmt->groupby_stmt()) {
-    // 为 groupby_oper 加一个sort 子算子
-    // 1.先构造 orderby_unit
-    auto & group_fields = select_stmt->groupby_stmt()->get_groupby_fields();
-    std::vector<unique_ptr<OrderByUnit>> order_units;
-    for(auto &expr: group_fields)
-    {
-      order_units.emplace_back(std::make_unique<OrderByUnit>(expr->deep_copy().release(),true));//这里指针需要深拷贝一份给 order by
-    }
+  // if (select_stmt->groupby_stmt()) {
+  //   // 为 groupby_oper 加一个sort 子算子
+  //   // 1.先构造 orderby_unit
+  //   auto & group_fields = select_stmt->groupby_stmt()->get_groupby_fields();
+  //   std::vector<unique_ptr<OrderByUnit>> order_units;
+  //   for(auto &expr: group_fields)
+  //   {
+  //     order_units.emplace_back(std::make_unique<OrderByUnit>(expr->deep_copy().release(),true));//这里指针需要深拷贝一份给 order by
+  //   }
 
-  //  2 .需要将 groupy_oper 中的 field_expr ,和 groupby  后的expr  复制一份传递给 orderby 算子
-    std::vector<std::unique_ptr<Expression>> field_exprs;
-    auto & field = select_stmt->groupby_stmt()->get_field_exprs();
-    for(auto &expr : field)
-    {
-      field_exprs.emplace_back(expr->deep_copy().release());
-    }
-    auto & tmp = select_stmt->groupby_stmt()->get_groupby_fields();
-    for(auto & expr :tmp )
-    {
-      field_exprs.emplace_back(expr->deep_copy().release());
-    }
+  // //  2 .需要将 groupy_oper 中的 field_expr ,和 groupby  后的expr  复制一份传递给 orderby 算子
+  //   std::vector<std::unique_ptr<Expression>> field_exprs;
+  //   auto & field = select_stmt->groupby_stmt()->get_field_exprs();
+  //   for(auto &expr : field)
+  //   {
+  //     field_exprs.emplace_back(expr->deep_copy().release());
+  //   }
+  //   auto & tmp = select_stmt->groupby_stmt()->get_groupby_fields();
+  //   for(auto & expr :tmp )
+  //   {
+  //     field_exprs.emplace_back(expr->deep_copy().release());
+  //   }
 
-    if (!select_stmt->groupby_stmt()->get_groupby_fields().empty()) {
-      unique_ptr<LogicalOperator> orderby_oper(new OrderByLogicalOperator(std::move(order_units),std::move(field_exprs)));
-      if (top_oper) {
-        orderby_oper->add_child(std::move(top_oper));
-      }
-      top_oper = std::move(orderby_oper);
-    }
+  //   if (!select_stmt->groupby_stmt()->get_groupby_fields().empty()) {
+  //     unique_ptr<LogicalOperator> orderby_oper(new OrderByLogicalOperator(std::move(order_units),std::move(field_exprs)));
+  //     if (top_oper) {
+  //       orderby_oper->add_child(std::move(top_oper));
+  //     }
+  //     top_oper = std::move(orderby_oper);
+  //   }
 
-    unique_ptr<LogicalOperator> groupby_oper;
-    rc = create_plan(select_stmt->groupby_stmt(), groupby_oper);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create groupby logical plan. rc=%s", strrc(rc));
-      return rc;
-    }
+  //   unique_ptr<LogicalOperator> groupby_oper;
+  //   rc = create_plan(select_stmt->groupby_stmt(), groupby_oper);
+  //   if (rc != RC::SUCCESS) {
+  //     LOG_WARN("failed to create groupby logical plan. rc=%s", strrc(rc));
+  //     return rc;
+  //   }
     
-    groupby_oper->add_child(std::move(top_oper));
-    top_oper = std::move(groupby_oper);
+  //   groupby_oper->add_child(std::move(top_oper));
+  //   top_oper = std::move(groupby_oper);
 
-    // if(groupby_oper){
-    //   if (top_oper) {
-    //     groupby_oper->add_child(std::move(top_oper));
-    //   }
-    //   top_oper = std::move(groupby_oper);
-    // }
-  }
+  // }
 
   if (select_stmt->having_stmt() != nullptr) {
     unique_ptr<LogicalOperator> predicate_oper;
