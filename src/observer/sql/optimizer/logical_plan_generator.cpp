@@ -238,35 +238,35 @@ RC LogicalPlanGenerator::create_plan(
 
   // }
 
-  if (select_stmt->having_stmt() != nullptr) {
-    unique_ptr<LogicalOperator> predicate_oper;
-    rc = create_plan(select_stmt->having_stmt(), predicate_oper);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create having predicate logical plan. rc=%s", strrc(rc));
-      return rc;
-    }
-    if (predicate_oper) {
-      if (top_oper) {
-        predicate_oper->add_child(std::move(top_oper));
-      }
-      top_oper = std::move(predicate_oper);
-    }
-  }
+  // if (select_stmt->having_stmt() != nullptr) {
+  //   unique_ptr<LogicalOperator> predicate_oper;
+  //   rc = create_plan(select_stmt->having_stmt(), predicate_oper);
+  //   if (rc != RC::SUCCESS) {
+  //     LOG_WARN("failed to create having predicate logical plan. rc=%s", strrc(rc));
+  //     return rc;
+  //   }
+  //   if (predicate_oper) {
+  //     if (top_oper) {
+  //       predicate_oper->add_child(std::move(top_oper));
+  //     }
+  //     top_oper = std::move(predicate_oper);
+  //   }
+  // }
 
-  if (select_stmt->orderby_stmt()) {
-    unique_ptr<LogicalOperator> orderby_oper;
-    rc = create_plan(select_stmt->orderby_stmt(), orderby_oper);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create orderby logical plan. rc=%s", strrc(rc));
-      return rc;
-    }
-    if(orderby_oper){
-      if (top_oper) {
-        orderby_oper->add_child(std::move(top_oper));
-      }
-      top_oper = std::move(orderby_oper);
-    }
-  }
+  // if (select_stmt->orderby_stmt()) {
+  //   unique_ptr<LogicalOperator> orderby_oper;
+  //   rc = create_plan(select_stmt->orderby_stmt(), orderby_oper);
+  //   if (rc != RC::SUCCESS) {
+  //     LOG_WARN("failed to create orderby logical plan. rc=%s", strrc(rc));
+  //     return rc;
+  //   }
+  //   if(orderby_oper){
+  //     if (top_oper) {
+  //       orderby_oper->add_child(std::move(top_oper));
+  //     }
+  //     top_oper = std::move(orderby_oper);
+  //   }
+  // }
   {
     unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(std::move(select_stmt->projects())));
     ASSERT(project_oper,"ERROR!");
