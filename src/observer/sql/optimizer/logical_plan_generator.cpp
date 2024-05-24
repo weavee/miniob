@@ -154,26 +154,26 @@ RC LogicalPlanGenerator::create_plan(
     }
     return RC::SUCCESS;
   };
-//join table
+
   unique_ptr<LogicalOperator> outside_prev_oper(nullptr); // 笛卡尔积
   for (auto& jt : tables) {
     unique_ptr<LogicalOperator> prev_oper(nullptr); // INNER JOIN
-    // auto& join_tables = jt.join_tables();
+    auto& join_tables = jt.join_tables();
     auto& on_conds = jt.on_conds();
-    // ASSERT(join_tables.size() == on_conds.size(), "ERROR!");
-    // for (size_t i = 0; i < join_tables.size(); ++i) {
-    //   if (rc = process_one_table(prev_oper, join_tables[i], on_conds[i]); RC::SUCCESS != rc) {
-    //     return rc;
-    //   }
-    // }
+    ASSERT(join_tables.size() == on_conds.size(), "ERROR!");
+    for (size_t i = 0; i < join_tables.size(); ++i) {
+      if (rc = process_one_table(prev_oper, join_tables[i], on_conds[i]); RC::SUCCESS != rc) {
+        return rc;
+      }
+    }
     // now combine outside_prev_oper and prev_oper
     if (outside_prev_oper == nullptr) {
       outside_prev_oper = std::move(prev_oper);
     } else {
-      // unique_ptr<JoinLogicalOperator> join_oper = std::make_unique<JoinLogicalOperator>();
-      // join_oper->add_child(std::move(outside_prev_oper));
-      // join_oper->add_child(std::move(prev_oper));
-      // outside_prev_oper = std::move(join_oper);
+      unique_ptr<JoinLogicalOperator> join_oper = std::make_unique<JoinLogicalOperator>();
+      join_oper->add_child(std::move(outside_prev_oper));
+      join_oper->add_child(std::move(prev_oper));
+      outside_prev_oper = std::move(join_oper);
     }
   }
 
@@ -297,16 +297,16 @@ RC LogicalPlanGenerator::create_plan(
   }
   std::vector<unique_ptr<Expression>> cmp_exprs;
   // 给子查询生成 logical oper
-  auto process_sub_query = [](Expression* expr) {
-    if (expr->type() == ExprType::SUBQUERY) {
-      SubQueryExpr* sub_query_expr = static_cast<SubQueryExpr*>(expr);
-      return sub_query_expr->generate_logical_oper();
-    }
-    return RC::SUCCESS;
-  };
-  if (RC rc = filter_stmt->condition()->traverse_check(process_sub_query); OB_FAIL(rc)) {
-    return rc;
-  }
+  // auto process_sub_query = [](Expression* expr) {
+  //   if (expr->type() == ExprType::SUBQUERY) {
+  //     SubQueryExpr* sub_query_expr = static_cast<SubQueryExpr*>(expr);
+  //     return sub_query_expr->generate_logical_oper();
+  //   }
+  //   return RC::SUCCESS;
+  // };
+  // if (RC rc = filter_stmt->condition()->traverse_check(process_sub_query); OB_FAIL(rc)) {
+  //   return rc;
+  // }
   cmp_exprs.emplace_back(std::move(filter_stmt->condition()));
   logical_operator = cmp_exprs2predicate_logic_oper(std::move(cmp_exprs));
   return RC::SUCCESS;
