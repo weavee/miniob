@@ -123,7 +123,6 @@ RC LogicalPlanGenerator::create_plan(
   RC rc = RC::SUCCESS;
 
   const std::vector<SelectStmt::JoinTables> &tables = select_stmt->join_tables();
-  // const std::vector<Field> &all_fields = select_stmt->query_fields();
 
   auto process_one_table = [/*, &all_fields*/](unique_ptr<LogicalOperator>& prev_oper, Table* table, FilterStmt* fu) {
     std::vector<Field> fields; 
@@ -341,18 +340,6 @@ RC LogicalPlanGenerator::create_plan(OrderByStmt *order_by_stmt, unique_ptr<Logi
   return RC::SUCCESS;
 }
 
-/*
-RC LogicalPlanGenerator::create_plan(
-    FilterUnit *filter_unit, unique_ptr<LogicalOperator> &logical_operator)
-{
-  std::vector<unique_ptr<Expression>> cmp_exprs;
-  ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(),  std::move(filter_unit->left()), std::move(filter_unit->right()));
-  cmp_exprs.emplace_back(cmp_expr);
-
-  logical_operator = cmp_exprs2predicate_logic_oper(std::move(cmp_exprs));
-  return RC::SUCCESS;
-}
-*/
 
 RC LogicalPlanGenerator::create_plan(
     InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
