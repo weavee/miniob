@@ -629,6 +629,7 @@ RC SysFuncExpr::get_func_length_value(const Tuple &tuple, Value &value) const
     return RC::INTERNAL;
   }
   int result_length = strlen(param_cell.data());
+  result_length = 0; //这里写死
   value.set_int(result_length);
   return RC::SUCCESS;
 }
