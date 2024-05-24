@@ -123,7 +123,6 @@ RC LogicalPlanGenerator::create_plan(
   RC rc = RC::SUCCESS;
 
   const std::vector<SelectStmt::JoinTables> &tables = select_stmt->join_tables();
-  // const std::vector<Field> &all_fields = select_stmt->query_fields();
 
   auto process_one_table = [/*, &all_fields*/](unique_ptr<LogicalOperator>& prev_oper, Table* table, FilterStmt* fu) {
     std::vector<Field> fields; 
@@ -297,16 +296,16 @@ RC LogicalPlanGenerator::create_plan(
   }
   std::vector<unique_ptr<Expression>> cmp_exprs;
   // 给子查询生成 logical oper
-  // auto process_sub_query = [](Expression* expr) {
-  //   if (expr->type() == ExprType::SUBQUERY) {
-  //     SubQueryExpr* sub_query_expr = static_cast<SubQueryExpr*>(expr);
-  //     return sub_query_expr->generate_logical_oper();
-  //   }
-  //   return RC::SUCCESS;
-  // };
-  // if (RC rc = filter_stmt->condition()->traverse_check(process_sub_query); OB_FAIL(rc)) {
-  //   return rc;
-  // }
+  auto process_sub_query = [](Expression* expr) {
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubQueryExpr* sub_query_expr = static_cast<SubQueryExpr*>(expr);
+      return sub_query_expr->generate_logical_oper();
+    }
+    return RC::SUCCESS;
+  };
+  if (RC rc = filter_stmt->condition()->traverse_check(process_sub_query); OB_FAIL(rc)) {
+    return rc;
+  }
   cmp_exprs.emplace_back(std::move(filter_stmt->condition()));
   logical_operator = cmp_exprs2predicate_logic_oper(std::move(cmp_exprs));
   return RC::SUCCESS;
