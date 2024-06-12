@@ -212,7 +212,6 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
   SubQueryExpr* left_subquery_expr = nullptr;
   SubQueryExpr* right_subquery_expr = nullptr;
-  // TODO(wbj) 为啥不能传两个参数
   DEFER([&left_subquery_expr]() {
     if (nullptr != left_subquery_expr) {
       left_subquery_expr->close();
@@ -401,17 +400,14 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
 
     case Type::DIV: {
       if (target_type == AttrType::INTS) {
-        if (right_value.get_int() == 0) {
-          // NOTE: 设置为整数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为整数最大值。
-          //value.set_int(numeric_limits<int>::max());
+        if (right_value.get_int() == 0) { //除数是否=0
           value.set_null();
         } else {
           value.set_int(left_value.get_int() / right_value.get_int());
         }
       } else {
         if (right_value.get_float() > -EPSILON && right_value.get_float() < EPSILON) {
-          // NOTE: 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-          //value.set_float(numeric_limits<float>::max());
+          //浮点的除数是否接近零
           value.set_null();
         } else {
           value.set_double(left_value.get_double() / right_value.get_double());
@@ -494,7 +490,7 @@ RC FieldExpr::check_field(const std::unordered_map<std::string, Table *> &table_
   const char* field_name = field_name_.c_str();
   Table * table = nullptr;
   if(!common::is_blank(table_name)) { //表名不为空
-    // check table
+    // 查找表名对应的表
     auto iter = table_map.find(table_name);
     if (iter == table_map.end()) {
       LOG_WARN("no such table in from list: %s", table_name);
@@ -509,17 +505,16 @@ RC FieldExpr::check_field(const std::unordered_map<std::string, Table *> &table_
     table = default_table ? default_table : tables[0];
   }
   ASSERT(nullptr != table, "ERROR!");
-  // set table_name
+  //设置表名为实际表名
   table_name = table->name();
-  // check field
+  // 检查字段是否存在
   const FieldMeta *field_meta = table->table_meta().field(field_name);
   if (nullptr == field_meta) {
     LOG_WARN("no such field. field=%s.%s", table->name(), field_name);
     return RC::SCHEMA_FIELD_MISSING;
   }
-  // set field_
+   // 设置字段对象
   field_ = Field(table, field_meta);
-  // set name 没用了 暂时保留它
   bool is_single_table = (tables.size() == 1);
   if(is_single_table) {
     set_name(field_name_);
@@ -605,8 +600,6 @@ AttrType AggrFuncExpr::value_type() const
 RC AggrFuncExpr::get_value(const Tuple &tuple, Value &cell) const
 {
   TupleCellSpec spec(name().c_str());
-  //int index = 0;
-  // spec.set_agg_type(get_aggr_func_type());
   if(is_first_)
   {
     bool & is_first_ref = const_cast<bool&>(is_first_);
@@ -629,7 +622,6 @@ RC SysFuncExpr::get_func_length_value(const Tuple &tuple, Value &value) const
     return RC::INTERNAL;
   }
   int result_length = strlen(param_cell.data());
-  result_length = 0; //这里写死
   value.set_int(result_length);
   return RC::SUCCESS;
 }
