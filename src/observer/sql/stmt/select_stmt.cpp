@@ -87,8 +87,7 @@ RC SelectStmt::process_from_clause(Db *db, std::vector<Table *> &tables,
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table *>(src_name, table));
     if (!alias.empty()) {
-      // 需要考虑别名重复的问题
-      // NOTE: 这里不能用 table_map 因为其中有 parent table
+      // 对别名在同层查重
       if (table_alias_set.count(alias) != 0) {
         return RC::INVALID_ARGUMENT;
       }
@@ -143,11 +142,11 @@ RC SelectStmt::process_from_clause(Db *db, std::vector<Table *> &tables,
     // join relations: t1 inner join **t2** on xxx inner join **t3** on xxx
     const std::vector<std::pair<std::string, std::string>>& join_relations = relations.join_relations;
     std::vector<Expression*>& conditions = relations.conditions;
-    // for (size_t j = 0; j < join_relations.size(); ++j) {
-    //   if (RC::SUCCESS != (rc = process_one_relation(join_relations[j], jt, conditions[j]))) {
-    //     return rc;
-    //   }
-    // }
+    for (size_t j = 0; j < join_relations.size(); ++j) {
+      if (RC::SUCCESS != (rc = process_one_relation(join_relations[j], jt, conditions[j]))) {
+        return rc;
+      }
+    }
     conditions.clear(); // 其所有权已经都交给了 FilterStmt
 
     // push jt to join_tables
