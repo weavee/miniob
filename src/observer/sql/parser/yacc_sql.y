@@ -338,7 +338,7 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE unique_option INDEX ID ON ID LBRACE ID idx_col_list RBRACE
+    CREATE unique_option INDEX ID ON ID LBRACE ID RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
@@ -346,11 +346,6 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       create_index.index_name = $4;
       create_index.relation_name = $6;
       
-      std::vector<std::string> *idx_cols = $9;
-      if (nullptr != idx_cols) {
-        create_index.attr_names.swap(*idx_cols);
-        delete $9;
-      }
       create_index.attr_names.emplace_back($8);
       std::reverse(create_index.attr_names.begin(), create_index.attr_names.end());
       free($4);
@@ -486,7 +481,7 @@ attr_def:
 null_option:
     /* empty */
     {
-      $$ = true;
+      $$ = false;
     }
     | NULL_T
     {
